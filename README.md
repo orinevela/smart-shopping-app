@@ -3,15 +3,39 @@
 MVP (שלב 1 מתוך מסמך האפיון): רשימות קניות חכמות + השוואת מחירים ומבצעים
 בין חנויות, מבוסס על נתוני מחירון (בדוגמה זו — נתוני seed, ראו הערה למטה).
 
-Stack: Next.js (App Router) + TypeScript + Prisma/SQLite + Tailwind CSS v4.
+Stack: Next.js (App Router) + TypeScript + Prisma/PostgreSQL + Tailwind CSS v4.
 Hebrew, RTL, mobile-first.
+
+## פריסה ל-Vercel
+
+1. **מסד נתונים** — ב-Vercel: Storage tab → Create Database → Postgres
+   (מבוסס Neon). זה מוסיף אוטומטית משתני סביבה של DATABASE_URL לפרויקט.
+   (אפשר גם Neon/Supabase חיצוני ולהדביק את מחרוזת החיבור ידנית.)
+2. ב-Vercel → New Project → ייבוא הריפו `orinevela/smart-shopping-app`.
+3. הוספת משתני סביבה בפרויקט (Settings → Environment Variables):
+   - `JWT_SECRET` — מחרוזת אקראית ארוכה.
+   - `SEED_SECRET` — מחרוזת אקראית (רק כדי להריץ את זריעת נתוני הדמו פעם
+     אחת אחרי הפריסה הראשונה — ראו מטה).
+   - `DATABASE_URL` כבר קיים אם נוצר מ-Storage tab; אחרת להוסיף ידנית.
+4. Deploy. שלב ה-build מריץ `prisma generate && prisma db push && next
+   build`, כך שהסכימה נוצרת אוטומטית במסד הנתונים בכל פריסה (מתאים ל-MVP;
+   פרויקט production אמיתי יעבור ל-`prisma migrate deploy` עם מיגרציות
+   שמורות ב-git).
+5. **זריעת נתוני דמו** (פעם אחת, אחרי הפריסה הראשונה — אין גישת shell
+   לסביבת Vercel כדי להריץ `npm run db:seed`, אז יש endpoint ייעודי):
+   ```bash
+   curl -X POST https://<your-app>.vercel.app/api/admin/seed \
+     -H "Authorization: Bearer <SEED_SECRET>"
+   ```
+   זה יוצר משתמש דמו (`demo@shop.app` / `shop1234`), 4 חנויות ו-22 מוצרים
+   עם מחירים ומבצעים. אפשר להריץ שוב בכל עת כדי לאפס לנתוני הדמו המקוריים.
 
 ## הרצה מקומית
 
 ```bash
 npm install
-cp .env.example .env       # and set a real JWT_SECRET for anything beyond local dev
-npx prisma db push          # creates prisma/dev.db from prisma/schema.prisma
+cp .env.example .env       # set DATABASE_URL to a real Postgres + a real JWT_SECRET
+npm run build                # runs prisma generate + db push, then builds
 npm run db:seed             # demo user, 4 stores, ~22 products with prices/promos
 npm run dev
 ```
@@ -66,9 +90,9 @@ npm run dev
 
 `prisma/schema.prisma` — `User` / `HomeLocation` / `Store` / `Product` /
 `Price` (כולל שדות מבצע: `promoLabel` / `promoUnitPrice` / `promoMinQty`
-ו-`source`) / `ShoppingList` / `ShoppingListItem` / `ListShare`. SQLite
-אינו תומך ב-enum מקורי ב-Prisma, כך שערכים כמו קטגוריה/יחידה/סטטוס הם
-מחרוזות עם הערה בסכימה; הערכים המותרים מוגדרים ב-`src/lib/constants.ts`.
+ו-`source`) / `ShoppingList` / `ShoppingListItem` / `ListShare`. ערכים כמו
+קטגוריה/יחידה/סטטוס הם מחרוזות (לא enum מקורי) עם הערה בסכימה; הערכים
+המותרים מוגדרים ב-`src/lib/constants.ts`.
 
 ## מגבלות ידועות (לא במסגרת ה-MVP)
 

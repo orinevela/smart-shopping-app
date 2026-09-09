@@ -3,12 +3,13 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// SQLite has no native enum support in Prisma, so categories/units/statuses are
-// plain strings; the allowed values are enforced in application code (src/lib/constants.ts).
+// Categories/units/statuses are plain strings rather than native Prisma enums
+// (the schema started on SQLite, which has no enum support); the allowed
+// values are enforced in application code (src/lib/constants.ts).
 
 model User {
   id           String   @id @default(uuid())
