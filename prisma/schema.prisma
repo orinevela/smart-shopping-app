@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite has no native enum support in Prisma, so categories/units/statuses are
+// plain strings; the allowed values are enforced in application code (src/lib/constants.ts).
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  homeLocation   HomeLocation?
+  shoppingLists  ShoppingList[]
+
+  @@map("users")
+}
+
+model HomeLocation {
+  id       String @id @default(uuid())
+  userId   String @unique
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label    String // e.g. "בית", "עבודה"
+  address  String
+  lat      Float
+  lng      Float
+  radiusKm Float  @default(5)
+
+  @@map("home_locations")
+}
+
+model Store {
+  id      String @id @default(uuid())
+  chain   String // e.g. "שופרסל", "רמי לוי"
+  branch  String // e.g. "סניף רמת אביב"
+  address String
+  lat     Float
+  lng     Float
+
+  hasDelivery      Boolean @default(false)
+  deliveryFee      Float?
+  deliveryMinOrder Float?
+  deliveryEtaMin   Int? // estimated delivery time in minutes
+
+  prices Price[]
+
+  @@map("stores")
+}
+
+model Product {
+  id          String @id @default(uuid())
+  name        String
+  category    String // PRODUCE | DAIRY_CHILLED | FROZEN | DRY_GOODS | CLEANING_TOILETRIES | MEAT_FISH | BAKERY | OTHER
+  defaultUnit String @default("UNIT") // UNIT | KG | LITER | PACK
+  aliases     String @default("") // comma-separated search aliases
+  barcode     String?
+
+  prices    Price[]
+  listItems ShoppingListItem[]
+
+  @@map("products")
+}
+
+model Price {
+  id        String  @id @default(uuid())
+  storeId   String
+  store     Store   @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  price          Float // regular price, per defaultUnit
+  promoLabel     String? // e.g. "2 ב-10 ₪", "20% הנחה למועדון"
+  promoUnitPrice Float? // effective price per unit once promo is applied
+  promoMinQty    Int? // quantity required to trigger the promo
+
+  source    String   @default("OFFICIAL_FEED") // OFFICIAL_FEED | CROWD
+  updatedAt DateTime @default(now())
+
+  @@unique([storeId, productId])
+  @@map("prices")
+}
+
+model ShoppingList {
+  id          String    @id @default(uuid())
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name        String
+  status      String    @default("active") // active | completed
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  items  ShoppingListItem[]
+  shares ListShare[]
+
+  @@map("shopping_lists")
+}
+
+model ShoppingListItem {
+  id           String       @id @default(uuid())
+  listId       String
+  list         ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  productId    String?
+  product      Product?     @relation(fields: [productId], references: [id])
+  freeTextName String? // used when no catalog product matches
+  quantity     Float        @default(1)
+  unit         String       @default("UNIT") // UNIT | KG | LITER | PACK
+  checked      Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+
+  @@map("shopping_list_items")
+}
+
+model ListShare {
+  id         String       @id @default(uuid())
+  listId     String
+  list       ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  token      String       @unique
+  permission String       @default("EDIT") // VIEW | EDIT
+  createdAt  DateTime     @default(now())
+
+  @@map("list_shares")
+}
